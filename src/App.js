@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import "./App.css";
 import Header from "./Header/Header";
 import TaskCount from "./TaskCount/TaskCount";
@@ -25,79 +26,89 @@ import AddNewTask from "./NewTask/AddNewTask";
 // JSX
 function App() {
   // If a value can be computed from one piece of state, no need to store it separately (count in this case)
-  const [tasks, setTasks] = useState([
-    {
-      text: "Clean the dishes",
-      completed: true,
-      dueDate: "2020-04-02",
-      urgent: false,
-      id: 1
-    },
-    {
-      text: "Wash the dog",
-      completed: false,
-      dueDate: "2020-04-03",
-      urgent: true,
-      id: 2
-    },
-    {
-      text: "Hoover the cupboard",
-      completed: true,
-      dueDate: "2020-04-04",
-      urgent: false,
-      id: 3
-    },
-    {
-      text: "Hoover the car",
-      completed: false,
-      dueDate: "2020-04-04",
-      urgent: false,
-      id: 4
-    }
-  ]);
+  const [tasks, setTasks] = useState([]);
+
+  // Only run this code once, when the component first mounts
+  useEffect(() => {
+    // Fetch tasks from Backend (GET)
+    axios.get("https://9d8ax0uq9j.execute-api.eu-west-1.amazonaws.com/dev/tasks")
+      .then(response => {
+        console.log("Success", response.data);
+        setTasks(response.data);
+      })
+      .catch(err => {
+        console.log("Error", err);
+      });
+
+    // the array would normally contain values that may change, and React would run the above code WHEN that value changes
+    // "Array of dependencies"
+  }, []);
+
 
   // A function to delete a task from the tasks array (based on ID), and update the state with the new, shorter array
   // Any function that updates state should live where the state lives
   const deleteTask = id => {
-    // delete/remove the task with the id from the tasks array
-
-    const filteredTasks = tasks.filter(task => {
-      return task.id !== id;
-    });
-
-    // Update the state with the new (shorter) array
-    setTasks(filteredTasks);
+    // Issue a DELETE request to my API via Postman
+      // If resolves, THEN I will filter my tasks on the frontend to remove the task with the given ID
+      // If rejects, I'm not gonna filter
+    axios.delete(`https://9d8ax0uq9j.execute-api.eu-west-1.amazonaws.com/dev/tasks/${id}`)
+      .then(response => {
+        const filteredTasks = tasks.filter(task => {
+          return task.TaskId !== id;
+        });
+    
+        // Update the state with the new (shorter) array
+        setTasks(filteredTasks);
+      })
+      .catch(err => {
+        console.log("API Error", err);
+      });
   };
 
   const markTaskComplete = (id) => {
-    // Create a new array of updated tasks, where the completed property of the matching task has been updated
-    const newTasks = tasks.map(task => {
-      if (task.id === id) {
-        task.completed = true;
-      }
+    axios
+      .put(
+        `https://9d8ax0uq9j.execute-api.eu-west-1.amazonaws.com/dev/tasks/${id}`, {
+          Completed: true
+        }
+      )
+      .then((response) => {
+        // Create a new array of updated tasks, where the completed property of the matching task has been updated
+        const newTasks = tasks.map((task) => {
+          if (task.TaskId === id) {
+            task.Completed = 1;
+          }
 
-      return task;
-    });
+          return task;
+        });
 
-    setTasks(newTasks);
+        setTasks(newTasks);
+      })
+      .catch((err) => {
+        console.log("Error updating Task", err);
+      });
   }
 
   const addNewTask = (text, date, urgent) => {
     // Create a new task object based on the data passed as parameters
-    const newTask = {
-      text: text,
-      dueDate: date,
-      urgent: urgent,
-      completed: false,
-      id: Math.random() * 1000, // TODO: UUID - use the uuid package from NPM to generate a unique UUID
-    };
-
-    // Create a new array of tasks, which includes this new task
-    // AVOID mutating arrays or object (push, pop, shift, splice, sort)
-    const newTasks = [...tasks, newTask];
-
-    // use the setTasks function to update the state
-    setTasks(newTasks);
+  
+    axios.post("https://9d8ax0uq9j.execute-api.eu-west-1.amazonaws.com/dev/tasks", {
+      Description: text,
+      DueDate: date,
+      Urgent: urgent
+    })
+      .then(response => {
+        const newTask = response.data;
+        // Create a new array of tasks, which includes this new task
+        // AVOID mutating arrays or object (push, pop, shift, splice, sort)
+        const newTasks = [...tasks, newTask];
+        
+        // use the setTasks function to update the state
+        setTasks(newTasks);
+      })
+      .catch(err => {
+        console.log("Error creating task", err);
+      });
   }
 
   return (
@@ -112,14 +123,14 @@ function App() {
             return (
               <Task
                 // An internal prop used by React to keep track of which Task component is which
-                key={task.id}
+                key={task.TaskId}
                 deleteTaskFunc={deleteTask}
                 markCompleteFunc={markTaskComplete}
-                text={task.text}
-                urgent={task.urgent}
-                completed={task.completed}
-                dueDate={task.dueDate}
-                id={task.id}
+                text={task.Description}
+                urgent={task.Urgent}
+                completed={task.Completed}
+                dueDate={task.DueDate}
+                id={task.TaskId}
               />
             );
           })}
